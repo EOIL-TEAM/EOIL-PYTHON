@@ -7,19 +7,29 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import httpx
 
-from .models import (
-    OBJECTIVE_TYPES,
+from .exceptions import (
     AuthError,
     EoilError,
     InsufficientBalanceError,
-    JobStatus,
     OptimizerError,
-    OptimizeResult,
     RateLimitError,
 )
+from .models import (
+    OBJECTIVE_TYPES,
+    JobStatus,
+    OptimizationResult,
+)
+from .catalogue import CatalogueClient
 
 _DEFAULT_BASE_URL = "https://api.eoil.ltd"
 _DEFAULT_TIMEOUT = 120.0  # seconds
+
+# Translates public-facing preset keys to the internal wire-format names.
+_PRESET_KEY_MAP: dict[str, str] = {
+    "restarts": "num_restarts",
+    "patience": "basin_escape_threshold",
+    "depth": "sorf_layers",
+}
 
 
 class Client:
@@ -66,14 +76,20 @@ class Client:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": f"eoil-python/0.2.0a1",
+                "User-Agent": f"eoil-python/0.2.0a2",
             },
             timeout=timeout,
         )
+        self._catalogue = CatalogueClient(self)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    @property
+    def catalogue(self) -> "CatalogueClient":
+        """Access the catalogue of named landscape methods."""
+        return self._catalogue
 
     def optimize(
         self,
@@ -86,7 +102,8 @@ class Client:
         compute_units: int = 100,
         max_eoil: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-    ) -> OptimizeResult:
+        heuristics_override: Optional[Dict[str, Any]] = None,
+    ) -> OptimizationResult:
         """
         Submit an optimisation job and wait for the result (inline mode).
 
@@ -114,7 +131,7 @@ class Client:
 
         Returns
         -------
-        OptimizeResult
+        OptimizationResult
         """
         if objective_type not in OBJECTIVE_TYPES:
             raise ValueError(
@@ -126,34 +143,19 @@ class Client:
         if not 100 <= budget_steps <= 100_000:
             raise ValueError("budget_steps must be between 100 and 100 000.")
 
-        job_payload: Dict[str, Any] = {
-            "objective_type": objective_type,
-            "dimension": dimension,
-            "budget_steps": budget_steps,
-        }
-        if bounds is not None:
-            job_payload["bounds"] = list(bounds)
-        if x0 is not None:
-            job_payload["x0"] = list(x0)
+        return self._post_job(
+            objective_type=objective_type,
+            dimension=dimension,
+            bounds=bounds,
+            x0=x0,
+            budget_steps=budget_steps,
+            compute_units=compute_units,
+            max_eoil=max_eoil,
+            idempotency_key=idempotency_key,
+            heuristics_override=heuristics_override,
+        )
 
-        body: Dict[str, Any] = {
-            "job": job_payload,
-            "computeUnits": compute_units,
-            "mode": "inline",
-        }
-        if max_eoil is not None:
-            body["maxEoil"] = max_eoil
-
-        extra_headers: Dict[str, str] = {}
-        if idempotency_key is not None:
-            extra_headers["Idempotency-Key"] = idempotency_key
-        else:
-            extra_headers["Idempotency-Key"] = str(uuid.uuid4())
-
-        response = self._http.post("/jobs", json=body, headers=extra_headers)
-        return self._parse_optimize_response(response)
-
-    def get_job(self, job_id: str) -> OptimizeResult:
+    def get_job(self, job_id: str) -> OptimizationResult:
         """
         Retrieve a previously submitted job by ID.
 
@@ -231,6 +233,54 @@ class Client:
     # Private helpers
     # ------------------------------------------------------------------
 
+    def _post_job(
+        self,
+        *,
+        objective_type: str,
+        dimension: int,
+        bounds: Optional[Union[Tuple[float, float], List[float]]] = None,
+        x0: Optional[List[float]] = None,
+        budget_steps: int = 1000,
+        compute_units: int = 100,
+        max_eoil: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+        heuristics_override: Optional[Dict[str, Any]] = None,
+    ) -> "OptimizationResult":
+        """Internal: build and POST a job payload, return parsed result."""
+        job_payload: Dict[str, Any] = {
+            "objective_type": objective_type,
+            "dimension": dimension,
+            "budget_steps": budget_steps,
+        }
+        if bounds is not None:
+            job_payload["bounds"] = list(bounds)
+        if x0 is not None:
+            job_payload["x0"] = list(x0)
+        if parameters is not None:
+            job_payload["parameters"] = parameters
+        if heuristics_override is not None:
+            job_payload["heuristics_override"] = {
+                _PRESET_KEY_MAP.get(k, k): v for k, v in heuristics_override.items()
+            }
+
+        body: Dict[str, Any] = {
+            "job": job_payload,
+            "computeUnits": compute_units,
+            "mode": "inline",
+        }
+        if max_eoil is not None:
+            body["maxEoil"] = max_eoil
+
+        extra_headers: Dict[str, str] = {}
+        if idempotency_key is not None:
+            extra_headers["Idempotency-Key"] = idempotency_key
+        else:
+            extra_headers["Idempotency-Key"] = str(uuid.uuid4())
+
+        response = self._http.post("/jobs", json=body, headers=extra_headers)
+        return self._parse_optimize_response(response)
+
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code in (200, 202):
             return
@@ -259,7 +309,7 @@ class Client:
             raise RateLimitError()
         raise EoilError(f"API error {response.status_code}: {error_msg}", status_code=response.status_code)
 
-    def _parse_optimize_response(self, response: httpx.Response) -> OptimizeResult:
+    def _parse_optimize_response(self, response: httpx.Response) -> OptimizationResult:
         if response.status_code not in (200, 202):
             self._raise_for_status(response)
 
@@ -278,7 +328,7 @@ class Client:
         result_data = data.get("result") or {}
         charged = data.get("charged") or {}
 
-        return OptimizeResult(
+        return OptimizationResult(
             job_id=data["jobId"],
             request_id=data.get("requestId", ""),
             status=JobStatus(data.get("status", "succeeded")),
@@ -294,13 +344,13 @@ class Client:
             eoil_charged=charged.get("eoilCharged"),
         )
 
-    def _parse_job_response(self, response: httpx.Response) -> OptimizeResult:
+    def _parse_job_response(self, response: httpx.Response) -> OptimizationResult:
         self._raise_for_status(response)
         data = response.json()
         result_data = data.get("result") or {}
         charged = data.get("charged") or {}
 
-        return OptimizeResult(
+        return OptimizationResult(
             job_id=data["jobId"],
             request_id=data.get("requestId", ""),
             status=JobStatus(data.get("status", "succeeded")),

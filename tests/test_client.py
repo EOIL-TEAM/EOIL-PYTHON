@@ -8,7 +8,7 @@ import httpx
 from pytest_httpx import HTTPXMock
 
 import eoil
-from eoil import Client, OptimizeResult, JobStatus
+from eoil import Client, OptimizationResult, OptimizeResult, JobStatus
 from eoil.models import AuthError, InsufficientBalanceError, RateLimitError, EoilError
 
 
@@ -71,7 +71,7 @@ def test_optimize_success(httpx_mock: HTTPXMock):
     with Client(api_key="eoil_sk_test") as c:
         result = c.optimize(objective_type="sphere", dimension=2, budget_steps=1000)
 
-    assert isinstance(result, OptimizeResult)
+    assert isinstance(result, OptimizationResult)
     assert result.job_id == "job_abc123"
     assert result.status == "succeeded"
     assert result.f_best == pytest.approx(0.000005)
@@ -272,3 +272,8 @@ def test_submit_job_returns_job_id(httpx_mock: HTTPXMock):
     with Client(api_key="eoil_sk_test") as c:
         job_id = c.submit_job(objective_type="ackley", dimension=5)
     assert job_id == "job_queued_99"
+
+
+def test_optimize_result_backwards_compat_alias():
+    """OptimizeResult is an alias for OptimizationResult."""
+    assert OptimizeResult is OptimizationResult

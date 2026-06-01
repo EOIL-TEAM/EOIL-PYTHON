@@ -6,41 +6,13 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-
-# ---------------------------------------------------------------------------
-# Errors
-# ---------------------------------------------------------------------------
-
-class EoilError(Exception):
-    """Base class for all EOIL SDK errors."""
-
-    def __init__(self, message: str, status_code: Optional[int] = None) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-
-
-class AuthError(EoilError):
-    """Raised when the API key is missing, invalid, or lacks required scopes."""
-
-
-class InsufficientBalanceError(EoilError):
-    """Raised when the account has insufficient EOIL credit balance."""
-
-    def __init__(self, message: str, balance_eoil: Optional[str] = None, required_eoil: Optional[str] = None) -> None:
-        super().__init__(message, status_code=402)
-        self.balance_eoil = balance_eoil
-        self.required_eoil = required_eoil
-
-
-class RateLimitError(EoilError):
-    """Raised when the rate limit is exceeded."""
-
-    def __init__(self, message: str = "Rate limit exceeded. Retry after a moment.") -> None:
-        super().__init__(message, status_code=429)
-
-
-class OptimizerError(EoilError):
-    """Raised when the optimizer service returns a failure."""
+from .exceptions import (  # noqa: F401 — re-exported for backwards compat
+    EoilError,
+    AuthError,
+    InsufficientBalanceError,
+    RateLimitError,
+    OptimizerError,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +40,7 @@ OBJECTIVE_TYPES = frozenset(
 # Result models
 # ---------------------------------------------------------------------------
 
-class OptimizeResult(BaseModel):
+class OptimizationResult(BaseModel):
     """Result returned by Client.optimize()."""
 
     job_id: str = Field(..., description="EOIL job ID")
@@ -80,7 +52,7 @@ class OptimizeResult(BaseModel):
     f_best: Optional[float] = Field(None, description="Best objective value found")
     total_steps: Optional[int] = Field(None, description="Function evaluations used")
     converged: Optional[bool] = Field(None, description="Whether the solver converged")
-    escapes: Optional[int] = Field(None, description="Number of basin escapes performed")
+    escapes: Optional[int] = Field(None, description="Solver iterations")
     time_ms: Optional[float] = Field(None, description="Wall-clock solve time in ms")
     compute_units_actual: Optional[int] = Field(None, description="Compute units consumed")
 
@@ -88,5 +60,25 @@ class OptimizeResult(BaseModel):
     fiat_currency: Optional[str] = None
     fiat_cost: Optional[str] = None
     eoil_charged: Optional[str] = None
+    credits_used: Optional[str] = Field(None, description="Alias for eoil_charged")
 
     model_config = {"use_enum_values": True}
+
+    @property
+    def x(self) -> Optional[List[float]]:
+        """Alias for x_best."""
+        return self.x_best
+
+    @property
+    def f(self) -> Optional[float]:
+        """Alias for f_best."""
+        return self.f_best
+
+    @property
+    def evals(self) -> Optional[int]:
+        """Alias for total_steps."""
+        return self.total_steps
+
+
+# Backwards-compatibility alias
+OptimizeResult = OptimizationResult
