@@ -1,10 +1,12 @@
 name: Publish to PyPI
 
-# Fires when sdk-sync pushes a sdk-v* tag to this repo
+# Fires when sdk-sync pushes a sdk-v* tag to this repo,
+# or manually via workflow_dispatch.
 on:
   push:
     tags:
       - "sdk-v*"
+  workflow_dispatch:
 
 jobs:
   build:
