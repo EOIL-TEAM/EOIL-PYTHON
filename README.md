@@ -224,7 +224,7 @@ result = client.catalogue.portfolio_sharpe(
     dimension=5,
     budget_steps=2000,
 )
-weights = result.x_best  # portfolio weights (softmax-normalised → sum to 1)
+weights = result.x_best  # portfolio weights, sum to 1
 
 # Minimise portfolio variance — pass an (N × N) covariance matrix
 cov = np.cov(returns.T)
@@ -268,7 +268,6 @@ result = client.catalogue.rastrigin(
 
 # get_preset() returns a copy — safe to modify
 opts = get_preset("portfolio")
-opts["num_restarts"] = 4
 result = client.catalogue.portfolio_sharpe(
     returns=returns,
     dimension=5,
@@ -277,14 +276,14 @@ result = client.catalogue.portfolio_sharpe(
 )
 ```
 
-| Preset | Restarts | Basin escape | SORF layers | Best for |
-|--------|----------|-------------|-------------|----------|
-| `fast` | 1 | 50 | 1 | CI / quick feasibility |
-| `balanced` | 3 | 100 | 2 | General use (default feel) |
-| `thorough` | 8 | 200 | 4 | Production quality |
-| `portfolio` | 2 | 300 | 2 | Sharpe / MinVol |
-| `ml_hyperparam` | 5 | 150 | 3 | Noisy ML search spaces |
-| `high_dimensional` | 1 | 500 | 6 | dim ≥ 100 |
+| Preset | Best for |
+|--------|----------|
+| `fast` | CI checks and quick feasibility runs |
+| `balanced` | General-purpose use |
+| `thorough` | Production-quality results |
+| `portfolio` | Sharpe ratio and minimum-variance problems |
+| `ml_hyperparam` | Machine learning hyper-parameter search |
+| `high_dimensional` | Problems with dimension ≥ 100 |
 
 ## Async job submission
 
@@ -319,7 +318,6 @@ The following features are on the roadmap but are **not available** in `0.2.x`:
 
 - **Streaming results** — real-time iteration callbacks / SSE progress events
 - **Custom objective functions** — uploading user-defined Python callables
-- **XGBoost / tree-based landscapes** — requires finite-difference gradient fallback (Sprint B)
 - **Async `await` client** — `AsyncClient` planned for Phase 3
 
 ## Development

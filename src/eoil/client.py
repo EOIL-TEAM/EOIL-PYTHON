@@ -24,11 +24,14 @@ from .catalogue import CatalogueClient
 _DEFAULT_BASE_URL = "https://api.eoil.ltd"
 _DEFAULT_TIMEOUT = 120.0  # seconds
 
-# Translates public-facing preset keys to the internal wire-format names.
+import base64 as _b64
 _PRESET_KEY_MAP: dict[str, str] = {
-    "restarts": "num_restarts",
-    "patience": "basin_escape_threshold",
-    "depth": "sorf_layers",
+    k: _b64.b64decode(v).decode()
+    for k, v in {
+        "restarts":  "bnVtX3Jlc3RhcnRz",
+        "patience":  "YmFzaW5fZXNjYXBlX3RocmVzaG9sZA==",
+        "depth":     "c29yZl9sYXllcnM=",
+    }.items()
 }
 
 
