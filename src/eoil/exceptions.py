@@ -35,3 +35,18 @@ class RateLimitError(EoilError):
 
 class OptimizerError(EoilError):
     """Raised when the optimizer service returns a failure."""
+
+
+class StreamError(EoilError):
+    """Raised on WebSocket streaming protocol errors or unexpected server-side close codes."""
+
+    def __init__(self, code: str, message: str = "") -> None:
+        super().__init__(f"{code}: {message}" if message else code)
+        self.code = code
+
+
+class SessionExpiredError(StreamError):
+    """Raised when the optimizer session has expired on the server (close code 4410)."""
+
+    def __init__(self, message: str = "Optimizer session expired.") -> None:
+        super().__init__("SESSION_GONE", message)

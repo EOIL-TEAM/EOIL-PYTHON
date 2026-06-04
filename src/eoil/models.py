@@ -82,3 +82,34 @@ class OptimizationResult(BaseModel):
 
 # Backwards-compatibility alias
 OptimizeResult = OptimizationResult
+
+
+# ---------------------------------------------------------------------------
+# Streaming result
+# ---------------------------------------------------------------------------
+
+class StreamResult(BaseModel):
+    """Result returned by Client.stream_optimize()."""
+
+    x_best: List[float] = Field(..., description="Best solution vector found")
+    f_best: float = Field(..., description="Best objective value found")
+    total_steps: int = Field(..., description="Function evaluations consumed")
+    converged: bool = Field(..., description="Whether the solver converged")
+    escapes: int = Field(0, description="Number of basin escapes performed")
+    compute_units_actual: Optional[int] = Field(None, description="Compute units consumed")
+    eoil_charged: Optional[str] = Field(None, description="EOIL credits charged for this session")
+
+    @property
+    def steps(self) -> int:
+        """Alias for total_steps."""
+        return self.total_steps
+
+    @property
+    def x(self) -> List[float]:
+        """Alias for x_best."""
+        return self.x_best
+
+    @property
+    def f(self) -> float:
+        """Alias for f_best."""
+        return self.f_best

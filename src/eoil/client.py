@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import httpx
 
@@ -18,8 +18,10 @@ from .models import (
     OBJECTIVE_TYPES,
     JobStatus,
     OptimizationResult,
+    StreamResult,
 )
 from .catalogue import CatalogueClient
+from .stream import StreamSession
 
 _DEFAULT_BASE_URL = "https://api.eoil.ltd"
 _DEFAULT_TIMEOUT = 120.0  # seconds
@@ -79,7 +81,7 @@ class Client:
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": f"eoil-python/0.2.0a2",
+                "User-Agent": "eoil-python/0.5.0",
             },
             timeout=timeout,
         )
@@ -157,6 +159,106 @@ class Client:
             idempotency_key=idempotency_key,
             heuristics_override=heuristics_override,
         )
+
+    def stream_optimize(
+        self,
+        fn: Callable,
+        *,
+        dimension: int,
+        budget_steps: int = 200,
+        bounds: Tuple[float, float] = (-5.0, 5.0),
+        x0: Optional[List[float]] = None,
+        gradient: Union[bool, str] = "auto",
+        fd_step: float = 1e-5,
+        on_step: Optional[Callable] = None,
+        timeout_s: float = 3600.0,
+        eval_timeout_s: float = 80.0,
+        verify_ssl: bool = True,
+    ) -> StreamResult:
+        """
+        Run your own objective function against the EOIL optimizer via WebSocket.
+
+        The optimizer runs on EOIL servers; only candidate vectors and scalar
+        values cross the network. Your function source never leaves your machine.
+
+        Parameters
+        ----------
+        fn:
+            Your objective function. Called as ``fn(x)`` where ``x`` is an
+            ``np.ndarray`` (if numpy is installed) or ``list[float]``.
+            Return either:
+
+            - a ``float`` — SDK computes gradient via finite differences
+              (costs ``2 × dimension`` extra calls per step, warning printed once)
+            - a ``(float, list[float])`` tuple — gradient used directly, no extra calls
+
+        dimension:
+            Problem dimensionality (1–1000).
+        budget_steps:
+            Maximum function evaluations (100–100 000). Default 200.
+        bounds:
+            Box bounds ``(lower, upper)`` applied uniformly. Default ``(-5.0, 5.0)``.
+        x0:
+            Optional initial point. Server picks a random start if omitted.
+        gradient:
+            ``"auto"`` (default) — inspect fn return type on first call.
+            ``True`` — fn must return ``(f, grad)``, raises if it returns scalar.
+            ``False`` — always use finite differences regardless of fn return.
+        fd_step:
+            Finite-difference step size. Default ``1e-5``.
+        on_step:
+            Optional callback ``on_step(step: int, x: list[float], f_best: float | None)``
+            called after each evaluation.
+        timeout_s:
+            Total session wall-clock timeout in seconds. Default 3600.
+        eval_timeout_s:
+            Per-evaluation timeout in seconds. SDK cancels cleanly and raises
+            if fn doesn't return within this limit. Default 80s (server cuts
+            sessions after 90s of inactivity).
+        verify_ssl:
+            Verify the server's TLS certificate. Set to ``False`` only for
+            staging or local development with self-signed certificates.
+            Default ``True``.
+
+        Returns
+        -------
+        StreamResult
+
+        Example
+        -------
+        ::
+
+            def rosenbrock(x):
+                return (1 - x[0])**2 + 100*(x[1] - x[0]**2)**2
+
+            result = client.stream_optimize(rosenbrock, dimension=2, budget_steps=500)
+            print(result.x_best, result.f_best)
+        """
+        if not 1 <= dimension <= 1000:
+            raise ValueError("dimension must be between 1 and 1000.")
+        if not 100 <= budget_steps <= 100_000:
+            raise ValueError("budget_steps must be between 100 and 100 000.")
+        if bounds[1] <= bounds[0]:
+            raise ValueError("bounds[1] (upper) must be greater than bounds[0] (lower).")
+        if gradient not in ("auto", True, False):
+            raise ValueError("gradient must be 'auto', True, or False.")
+
+        session = StreamSession(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            fn=fn,
+            dimension=dimension,
+            budget_steps=budget_steps,
+            bounds=bounds,
+            x0=x0,
+            gradient=gradient,
+            fd_step=fd_step,
+            on_step=on_step,
+            timeout_s=timeout_s,
+            eval_timeout_s=eval_timeout_s,
+            verify_ssl=verify_ssl,
+        )
+        return session.run()
 
     def get_job(self, job_id: str) -> OptimizationResult:
         """

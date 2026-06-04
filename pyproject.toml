@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eoil"
-version = "0.2.0a2"
+version = "0.5.0"
 description = "EOIL compute optimisation SDK"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [{ name = "EOIL Team", email = "sdk@eoil.ltd" }]
 keywords = ["optimisation", "optimization", "api", "eoil"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
@@ -26,22 +26,28 @@ classifiers = [
 dependencies = [
   "httpx>=0.27.0",
   "pydantic>=2.7.0",
+  "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
+scipy = ["scipy>=1.11.0"]
+sklearn = ["scikit-learn>=1.4.0"]
+torch = ["torch>=2.0.0"]
+pandas = ["pandas>=2.0.0"]
+adapters = ["scipy>=1.11.0", "scikit-learn>=1.4.0", "pandas>=2.0.0"]
 dev = [
   "pytest>=7.4.0",
   "pytest-cov>=4.1.0",
   "pytest-httpx>=0.30.0",
   "ruff>=0.6.0",
   "mypy>=1.10.0",
+  "scipy>=1.11.0",
 ]
 
 [project.urls]
 Homepage = "https://eoil.ltd"
 Documentation = "https://eoil.ltd/docs"
-Repository = "https://github.com/EOIL-TEAM/EOIL-PYTHON"
-"Bug Tracker" = "https://github.com/EOIL-TEAM/EOIL-PYTHON/issues"
+"Bug Tracker" = "https://eoil.ltd/support"
 
 [tool.setuptools.packages.find]
 where = ["src"]
