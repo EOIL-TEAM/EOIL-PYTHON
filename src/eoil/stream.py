@@ -90,9 +90,7 @@ class StreamSession:
         self._eval_timeout_s = eval_timeout_s
         self._verify_ssl = verify_ssl
 
-        self._use_fd: bool = False          # resolved during probe / first step
         self._fd_warned: bool = False       # one-time FD warning flag
-        self._gradient_probed: bool = False # has auto-probe run?
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -118,12 +116,6 @@ class StreamSession:
                 ssl=ssl_context,
             ) as ws:
                 deadline = time.monotonic() + self._timeout_s
-
-                # Resolve gradient mode before entering the loop
-                if self._gradient == "auto":
-                    self._probe_gradient()
-                elif self._gradient is False:
-                    self._use_fd = True
 
                 for raw in ws:
                     if time.monotonic() > deadline:
@@ -203,21 +195,6 @@ class StreamSession:
             params["x0"] = json.dumps(self._x0)
 
         return f"{ws_base}/optimizer/stream?{urlencode(params)}"
-
-    def _probe_gradient(self) -> None:
-        """Call fn once with a dummy point to detect its return signature."""
-        dummy = _coerce_x([0.0] * self._dimension)
-        try:
-            result = self._fn(dummy)
-        except Exception:
-            # If probe fails, fall back to FD — fn may need a real x
-            self._use_fd = True
-            return
-        if isinstance(result, tuple) and len(result) == 2:
-            self._use_fd = False
-        else:
-            self._use_fd = True
-        self._gradient_probed = True
 
     def _handle_x(self, ws, frame: dict) -> None:
         x_raw: List[float] = frame["x"]

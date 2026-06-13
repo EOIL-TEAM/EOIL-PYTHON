@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eoil"
-version = "0.5.0"
+version = "0.5.1"
 description = "EOIL compute optimisation SDK"
 readme = "README.md"
 license = { text = "MIT" }
@@ -47,7 +47,8 @@ dev = [
 [project.urls]
 Homepage = "https://eoil.ltd"
 Documentation = "https://eoil.ltd/docs"
-"Bug Tracker" = "https://eoil.ltd/support"
+"Source" = "https://github.com/EOIL-TEAM/EOIL-PYTHON"
+"Bug Tracker" = "https://github.com/EOIL-TEAM/EOIL-PYTHON/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

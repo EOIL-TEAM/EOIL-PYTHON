@@ -88,7 +88,7 @@ result = client.stream_optimize(
 |---|---|---|
 | `fn` | required | Objective function. Returns `float` or `(float, list[float])`. |
 | `dimension` | required | Problem dimensionality (1–1000). |
-| `budget_steps` | `200` | Approximate number of function evaluations (100–100 000). |
+| `budget_steps` | `1000` | Approximate number of function evaluations (100–100 000). |
 | `bounds` | `(-5.0, 5.0)` | Box bounds `(lower, upper)` applied uniformly. |
 | `x0` | `None` | Initial point. Server picks randomly if omitted. |
 | `gradient` | `"auto"` | Gradient supply mode — see table above. |
@@ -272,4 +272,4 @@ pytest tests/ -v
 
 - [Dashboard](https://app.eoil.ltd)
 - [API reference](https://eoil.ltd/docs)
-- [Status](https://status.eoil.ltd)
+- [Status](https://eoil.ltd/status)
