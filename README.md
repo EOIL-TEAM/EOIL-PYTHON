@@ -2,7 +2,7 @@
 
 Python client for the [EOIL](https://eoil.ltd) optimisation API.
 
-> **Version:** `0.5.0` — beta. API is stable.
+> **Version:** `0.5.2` — beta. API is stable.
 
 ## Installation
 
